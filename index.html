@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DLI Division — Special Trains Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; color: #1a1a2e; min-height: 100vh; }
+
+  #app { max-width: 1400px; margin: 0 auto; padding: 16px; }
+
+  /* HEADER */
+  #header {
+    background: #0a2240; color: #fff; padding: 14px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-radius: 10px; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  }
+  #header-left { display: flex; align-items: center; gap: 14px; }
+  #header-logo {
+    width: 48px; height: 48px; background: #d4a017; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; font-weight: 700; color: #0a2240; flex-shrink: 0;
+  }
+  #header h1 { font-size: 16px; font-weight: 600; color: #fff; line-height: 1.3; }
+  #header p  { font-size: 11px; color: #a0b4c8; margin-top: 3px; }
+  #header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  #date-from, #date-to {
+    background: #1a3a5c; border: 1px solid #3a5a7c; border-radius: 6px;
+    color: #fff; padding: 7px 12px; font-size: 13px; cursor: pointer;
+  }
+  #date-from::-webkit-calendar-picker-indicator,
+  #date-to::-webkit-calendar-picker-indicator { filter: invert(1); }
+  .btn {
+    background: #d4a017; color: #0a2240; border: none; border-radius: 6px;
+    padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .btn:hover { background: #e6b020; }
+  #refresh-info { font-size: 11px; color: #a0b4c8; }
+
+  /* STATUS */
+  #status-bar {
+    font-size: 12px; color: #555; margin-bottom: 12px; padding: 7px 12px;
+    background: #fff; border-radius: 6px; border: 1px solid #e0e4ea;
+    display: flex; align-items: center; gap: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  #status-dot { width: 8px; height: 8px; border-radius: 50%; background: #2ecc71; display: inline-block; flex-shrink: 0; }
+  #status-dot.loading { background: #d4a017; animation: pulse 1s infinite; }
+  #status-dot.error   { background: #e74c3c; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+  /* SECTION LABELS */
+  .section-label {
+    font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase;
+    letter-spacing: .07em; margin: 16px 0 7px;
+  }
+
+  /* KPI GRIDS */
+  .kpi-grid   { display: grid; gap: 10px; margin-bottom: 4px; }
+  .kpi-grid-3 { grid-template-columns: repeat(3, 1fr); }
+  .kpi-grid-4 { grid-template-columns: repeat(4, 1fr); }
+  .kpi-grid-9 { grid-template-columns: repeat(9, 1fr); }
+
+  .kpi-card {
+    background: #fff; border: 1px solid #e0e4ea; border-radius: 8px;
+    padding: 12px 14px; text-align: center;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .kpi-card.accent { border-top: 3px solid #d4a017; }
+  .kpi-label { font-size: 11px; color: #6b7280; margin-bottom: 5px; line-height: 1.3; }
+  .kpi-value { font-size: 26px; font-weight: 600; color: #0a2240; line-height: 1; }
+  .kpi-value.small  { font-size: 22px; }
+  .kpi-value.xsmall { font-size: 17px; }
+  .kpi-sub { font-size: 10px; color: #9ca3af; margin-top: 3px; }
+
+  .dir-card { border-top: 3px solid #ccc; }
+  .dir-card.east  { border-color: #e07020; }
+  .dir-card.west  { border-color: #2070d4; }
+  .dir-card.north { border-color: #20a060; }
+  .dir-card.south { border-color: #9020d4; }
+
+  /* CHARTS */
+  .charts-row  { display: grid; gap: 12px; margin-top: 16px; }
+  .charts-2-1  { grid-template-columns: 2fr 1fr; }
+  .charts-1-1  { grid-template-columns: 1fr 1fr; }
+
+  .chart-card {
+    background: #fff; border: 1px solid #e0e4ea; border-radius: 8px;
+    padding: 14px 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .chart-title { font-size: 12px; font-weight: 600; color: #6b7280; margin-bottom: 10px; }
+  .chart-wrap  { position: relative; width: 100%; }
+
+  /* TABLE */
+  #table-section {
+    margin-top: 16px; background: #fff; border: 1px solid #e0e4ea;
+    border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  #table-header {
+    padding: 10px 16px; display: flex; align-items: center;
+    justify-content: space-between; border-bottom: 1px solid #e0e4ea;
+    background: #f8f9fb; flex-wrap: wrap; gap: 8px;
+  }
+  #table-header-label { font-size: 13px; font-weight: 600; color: #374151; }
+  .filter-group { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .filter-btn {
+    background: #fff; border: 1px solid #d1d5db; border-radius: 5px;
+    padding: 5px 10px; font-size: 11px; color: #6b7280; cursor: pointer;
+  }
+  .filter-btn:hover { background: #f3f4f6; }
+  .filter-btn.active { background: #0a2240; color: #fff; border-color: #0a2240; }
+  #search-box {
+    border: 1px solid #d1d5db; border-radius: 5px; background: #fff;
+    color: #374151; padding: 6px 12px; font-size: 12px; width: 220px;
+  }
+  #search-box:focus { outline: none; border-color: #0a2240; }
+
+  #table-wrap { overflow-x: auto; max-height: 400px; overflow-y: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 1000px; }
+  thead th {
+    background: #0a2240; color: #a0b4c8; font-size: 11px; font-weight: 600;
+    padding: 8px 12px; text-align: left; position: sticky; top: 0; z-index: 2; white-space: nowrap;
+  }
+  tbody tr:nth-child(even) { background: #f9fafb; }
+  tbody tr:hover { background: #eef2ff; }
+  tbody td { padding: 7px 12px; color: #374151; white-space: nowrap; border-bottom: 1px solid #f3f4f6; }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600; }
+  .b-orig { background: #dcfce7; color: #166534; }
+  .b-pass { background: #dbeafe; color: #1e3a8a; }
+  .b-e    { background: #ffedd5; color: #9a3412; }
+  .b-w    { background: #dbeafe; color: #1e3a8a; }
+  .b-n    { background: #dcfce7; color: #166534; }
+  .b-s    { background: #f3e8ff; color: #6b21a8; }
+  .b-pm   { background: #fee2e2; color: #991b1b; }
+
+  #no-data { text-align: center; padding: 50px; color: #9ca3af; font-size: 14px; }
+
+  #pagination {
+    padding: 10px 16px; display: flex; align-items: center; gap: 10px;
+    font-size: 12px; color: #6b7280; border-top: 1px solid #e0e4ea;
+    background: #f8f9fb; flex-wrap: wrap;
+  }
+  .pg-btn {
+    background: #fff; border: 1px solid #d1d5db; border-radius: 5px;
+    padding: 4px 12px; font-size: 12px; cursor: pointer; color: #374151;
+  }
+  .pg-btn:hover { background: #f3f4f6; }
+  .pg-btn:disabled { opacity: .4; cursor: default; }
+
+  /* FOOTER */
+  #footer {
+    text-align: center; margin-top: 18px; padding: 10px;
+    font-size: 11px; color: #9ca3af;
+  }
+
+  @media (max-width: 900px) {
+    .kpi-grid-9 { grid-template-columns: repeat(3, 1fr); }
+    .kpi-grid-4 { grid-template-columns: repeat(2, 1fr); }
+    .charts-2-1, .charts-1-1 { grid-template-columns: 1fr; }
+    #header { flex-direction: column; align-items: flex-start; }
+  }
+  @media (max-width: 600px) {
+    .kpi-grid-3 { grid-template-columns: 1fr; }
+    .kpi-grid-9 { grid-template-columns: repeat(3, 1fr); }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HEADER -->
+  <div id="header">
+    <div id="header-left">
+      <div id="header-logo">IR</div>
+      <div>
+        <h1>DLI Division — Special Trains Dashboard</h1>
+        <p>Northern Railways</p>
+      </div>
+    </div>
+    <div id="header-right">
+      <span style="font-size:12px;color:#a0b4c8;">From</span>
+      <input type="date" id="date-from">
+      <span style="font-size:12px;color:#a0b4c8;">To</span>
+      <input type="date" id="date-to">
+      <button class="btn" onclick="loadData()">&#8635;&nbsp; Refresh</button>
+      <span id="refresh-info">Auto-refresh: every 1 hr</span>
+    </div>
+  </div>
+
+  <!-- STATUS — errors only, success hidden after load -->
+  <div id="status-bar" style="display:none">
+    <span id="status-dot" class="loading"></span>
+    <span id="status-text">Connecting to Google Sheets...</span>
+  </div>
+
+  <!-- KPI ROW 1 -->
+  <div class="section-label">Overview — Selected Date Range</div>
+  <div class="kpi-grid kpi-grid-3">
+    <div class="kpi-card accent">
+      <div class="kpi-label">Total Specials Running</div>
+      <div class="kpi-value" id="k-total">—</div>
+      <div class="kpi-sub" id="kpi-range-sub">in selected range</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Originating</div>
+      <div class="kpi-value" id="k-orig">—</div>
+      <div class="kpi-sub">from DLI Division</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Passing</div>
+      <div class="kpi-value" id="k-pass">—</div>
+      <div class="kpi-sub">through DLI Division</div>
+    </div>
+  </div>
+
+  <!-- KPI ROW 2 — Directions -->
+  <div class="section-label">Direction-wise Count</div>
+  <div class="kpi-grid kpi-grid-4">
+    <div class="kpi-card dir-card east"><div class="kpi-label">East Bound</div><div class="kpi-value small" id="k-east">—</div></div>
+    <div class="kpi-card dir-card west"><div class="kpi-label">West Bound</div><div class="kpi-value small" id="k-west">—</div></div>
+    <div class="kpi-card dir-card north"><div class="kpi-label">North Bound</div><div class="kpi-value small" id="k-north">—</div></div>
+    <div class="kpi-card dir-card south"><div class="kpi-label">South Bound</div><div class="kpi-value small" id="k-south">—</div></div>
+  </div>
+
+  <!-- KPI ROW 3 — Terminals -->
+  <div class="section-label">Terminal-wise Count (DLI Division)</div>
+  <div class="kpi-grid kpi-grid-9" id="terminal-grid"></div>
+
+  <!-- CHARTS ROW 1 -->
+  <div class="charts-row charts-2-1">
+    <div class="chart-card">
+      <div class="chart-title">Terminal-wise train count</div>
+      <div class="chart-wrap" style="height:210px"><canvas id="terminalChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Direction-wise distribution</div>
+      <div class="chart-wrap" style="height:210px"><canvas id="dirChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- CHARTS ROW 2 -->
+  <div class="charts-row charts-1-1">
+    <div class="chart-card">
+      <div class="chart-title">7-day trend — specials per day</div>
+      <div class="chart-wrap" style="height:190px"><canvas id="trendChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Maintenance — PM at DLI vs Other Divisions</div>
+      <div class="chart-wrap" style="height:190px"><canvas id="maintChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- DATA TABLE -->
+  <div id="table-section">
+    <div id="table-header">
+      <span id="table-header-label">Detailed Train List</span>
+      <div class="filter-group">
+        <button class="filter-btn active" onclick="setFilter('all',this)">All</button>
+        <button class="filter-btn" onclick="setFilter('Originating',this)">Originating</button>
+        <button class="filter-btn" onclick="setFilter('Passing',this)">Passing</button>
+        <input type="text" id="search-box" placeholder="&#128269; Search train / station..." oninput="renderTable()">
+      </div>
+    </div>
+    <div id="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>S.No</th>
+            <th>Train No</th>
+            <th>From Stn</th>
+            <th>To Stn</th>
+            <th>D/P Time</th>
+            <th>A/R Time</th>
+            <th>Bound Direction</th>
+            <th>Orig / Pass</th>
+            <th>Terminal (DLI Div)</th>
+            <th>Maintenance</th>
+            <th>Train Type</th>
+            <th>Total Load</th>
+            <th>Load Details</th>
+            <th>Via</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+      <div id="no-data" style="display:none">
+        No special trains found for the selected date.<br>
+        <small style="color:#bbb;margin-top:6px;display:block">Please check that the date exists in your Google Sheet and that the sheet is shared publicly.</small>
+      </div>
+    </div>
+    <div id="pagination">
+      <button class="pg-btn" id="btn-prev" onclick="prevPage()">&#8592; Prev</button>
+      <span id="pg-info">Page 1 of 1</span>
+      <button class="pg-btn" id="btn-next" onclick="nextPage()">Next &#8594;</button>
+      <span style="margin-left:auto" id="pg-total"></span>
+    </div>
+  </div>
+
+  <div id="footer">
+    DLI Division Special Trains Dashboard &nbsp;·&nbsp; Northern Railways &nbsp;·&nbsp; Data source: Google Sheets (live)
+    <br>Created by <strong>Hari Om</strong> &nbsp;(CHG Cell DRMO / Dli Div)
+  </div>
+
+</div>
+
+<script>
+/* ============================================================
+   CONFIGURATION — update if Sheet ID or API key changes
+   ============================================================ */
+const API_KEY  = 'AIzaSyDGS15xARpwOI8W8Fo0Avkv2gRGAjU4VE0';
+const SHEET_ID = '1Y84ROwQn4X0Dg3sHgGMeYmnBnEiTl97U3I3TqkSyogE';
+const SHEET_TAB = 'Master_Sheet';
+const TERMINALS = ['DLI','NZM','NDLS','ANVT','ROK','JIND','KKDE','SSB','DEE'];
+const PAGE_SIZE = 20;
+
+/* ============================================================
+   Column index map (0-based, columns A–AB)
+   ============================================================ */
+const COL = {
+  sno:       0,   // A  S.No
+  trainNo:   1,   // B  Train No
+  fromRly:   0,   // A  From Rly (same col — ignored for now)
+  fromStn:   2,   // C  From Stn
+  dpTime:    3,   // D  D/P Time
+  toStn:     4,   // E  To Stn
+  arTime:    5,   // F  A/R Time
+  jcoDate:   7,   // H  Date of Run (JCO)  ← used for Originating
+  terminal:  8,   // I  Terminal Over DLI Div
+  maint:     9,   // J  Type of Maintenance over DLI
+  direction: 11,  // L  Bound Direction
+  origPass:  12,  // M  Passing/Originating  ← key filter field
+  totalLoad: 13,  // N  Total Load
+  loadDtls:  14,  // O  Load Details
+  arrDLI:    17,  // R  A/R at DLI Div On Date  ← used for Passing
+  trainType: 25,  // Z  Train Type
+  via1:      26,  // AA Via
+  via2:      27,  // AB Via (alt)
+};
+
+/* ============================================================
+   STATE
+   ============================================================ */
+let allData      = [];
+let filteredData = [];
+let activeFilter = 'all';
+let currentPage  = 1;
+let termChart, dirChartObj, trendChartObj, maintChartObj;
+
+/* ============================================================
+   INIT
+   ============================================================ */
+window.addEventListener('DOMContentLoaded', () => {
+  const today = toISO(new Date());
+  document.getElementById('date-from').value = today;
+  document.getElementById('date-to').value   = today;
+  document.getElementById('date-from').addEventListener('change', update);
+  document.getElementById('date-to').addEventListener('change', update);
+  buildTerminalGrid();
+  loadData();
+  setInterval(loadData, 3600000);
+});
+
+/* ============================================================
+   DATE HELPERS
+   ============================================================ */
+function toISO(d) { return d.toISOString().split('T')[0]; }
+
+function isoToSheet(iso) {
+  const [y, m, d] = iso.split('-');
+  return `${parseInt(m)}/${parseInt(d)}/${parseInt(y)}`;
+}
+
+function normaliseDate(val) {
+  if (!val) return null;
+  const s = val.toString().trim();
+  const p = s.split('/');
+  if (p.length === 3) return `${parseInt(p[0])}/${parseInt(p[1])}/${parseInt(p[2])}`;
+  return null;
+}
+
+// Convert sheet date M/D/YYYY back to YYYY-MM-DD for range comparison
+function sheetDateToISO(val) {
+  if (!val) return null;
+  const s = val.toString().trim();
+  const p = s.split('/');
+  if (p.length === 3) {
+    return `${p[2].padStart(4,'0')}-${p[0].padStart(2,'0')}-${p[1].padStart(2,'0')}`;
+  }
+  return null;
+}
+
+/* ============================================================
+   BUILD TERMINAL KPI GRID
+   ============================================================ */
+function buildTerminalGrid() {
+  document.getElementById('terminal-grid').innerHTML =
+    TERMINALS.map(t =>
+      `<div class="kpi-card">
+         <div class="kpi-label">${t}</div>
+         <div class="kpi-value xsmall" id="k-${t}">—</div>
+       </div>`
+    ).join('');
+}
+
+/* ============================================================
+   FETCH DATA FROM GOOGLE SHEETS
+   ============================================================ */
+async function loadData() {
+  setStatus('loading', 'Connecting...', true);
+  try {
+    const url =
+      `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/` +
+      `${encodeURIComponent(SHEET_TAB)}!A:AB?key=${API_KEY}`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err.error && err.error.message) || `HTTP ${res.status}`);
+    }
+    const json = await res.json();
+    const rows = json.values || [];
+    if (rows.length < 2) { setStatus('ok', 'Sheet appears empty.', true); return; }
+    allData = rows.slice(1).filter(r => r && r.length > 1);
+    setStatus('ok', '', false); // hide on success
+    update();
+  } catch (e) {
+    setStatus('error', '✕ ' + e.message + ' — Check sheet is set to "Anyone with link can view".', true);
+  }
+}
+
+function setStatus(type, msg, visible) {
+  const bar = document.getElementById('status-bar');
+  bar.style.display = visible ? 'flex' : 'none';
+  const dot = document.getElementById('status-dot');
+  dot.className = type === 'loading' ? 'loading' : (type === 'error' ? 'error' : '');
+  document.getElementById('status-text').textContent = msg;
+}
+
+/* ============================================================
+   FILTER DATA FOR DATE RANGE (inclusive)
+   ============================================================ */
+function getRangeData(fromISO, toISO) {
+  return allData.filter(r => {
+    const type = (r[COL.origPass] || '').toString().trim();
+    let dateISO = null;
+    if (type === 'Originating') dateISO = sheetDateToISO(r[COL.jcoDate]);
+    else if (type === 'Passing') dateISO = sheetDateToISO(r[COL.arrDLI]);
+    if (!dateISO) return false;
+    return dateISO >= fromISO && dateISO <= toISO;
+  });
+}
+
+/* ============================================================
+   MAIN UPDATE
+   ============================================================ */
+function update() {
+  const fromISO = document.getElementById('date-from').value;
+  let   toISO   = document.getElementById('date-to').value;
+  if (!fromISO || !toISO) return;
+  if (toISO < fromISO) {
+    document.getElementById('date-to').value = fromISO;
+    toISO = fromISO;
+  }
+  const rangeData = getRangeData(fromISO, toISO);
+
+  // Update KPI sub label
+  const sub = document.getElementById('kpi-range-sub');
+  if (sub) sub.textContent = fromISO === toISO ? `on ${formatDisplay(fromISO)}` : `${formatDisplay(fromISO)} – ${formatDisplay(toISO)}`;
+
+  updateKPIs(rangeData);
+  updateCharts(rangeData, fromISO, toISO);
+  filteredData = rangeData;
+  activeFilter = 'all';
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.filter-btn')[0].classList.add('active');
+  const sb = document.getElementById('search-box');
+  if (sb) sb.value = '';
+  currentPage = 1;
+  renderTable();
+}
+
+function formatDisplay(iso) {
+  const d = new Date(iso + 'T00:00:00');
+  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+/* ============================================================
+   KPI CARDS
+   ============================================================ */
+function updateKPIs(data) {
+  const orig = data.filter(r => cell(r, COL.origPass) === 'Originating').length;
+  const pass = data.filter(r => cell(r, COL.origPass) === 'Passing').length;
+  set('k-total', data.length);
+  set('k-orig',  orig);
+  set('k-pass',  pass);
+
+  const dirs = { East: 0, West: 0, North: 0, South: 0 };
+  data.forEach(r => {
+    const d = cell(r, COL.direction);
+    if (d in dirs) dirs[d]++;
+  });
+  set('k-east',  dirs.East);
+  set('k-west',  dirs.West);
+  set('k-north', dirs.North);
+  set('k-south', dirs.South);
+
+  TERMINALS.forEach(t => {
+    const cnt = data.filter(r =>
+      (r[COL.terminal] || '').toString().toUpperCase().includes(t)
+    ).length;
+    const el = document.getElementById('k-' + t);
+    if (el) el.textContent = cnt;
+  });
+}
+
+function cell(r, idx) { return (r[idx] || '').toString().trim(); }
+function set(id, val)  { const el = document.getElementById(id); if (el) el.textContent = val; }
+
+/* ============================================================
+   CHARTS
+   ============================================================ */
+function updateCharts(data, fromISO, toISO) {
+  const termCounts = TERMINALS.map(t =>
+    data.filter(r => (r[COL.terminal] || '').toString().toUpperCase().includes(t)).length
+  );
+
+  const dirs = { East: 0, West: 0, North: 0, South: 0 };
+  data.forEach(r => { const d = cell(r, COL.direction); if (d in dirs) dirs[d]++; });
+
+  const pmDLI = data.filter(r => {
+    const m = (r[COL.maint] || '').toString().toUpperCase();
+    return m.includes('PM AT DLI') || m.trim() === 'PM';
+  }).length;
+  const pmOther = data.length - pmDLI;
+
+  // Trend — 7 days centred on fromISO
+  const base = new Date(fromISO + 'T00:00:00');
+  const trendLabels = [], trendCounts = [];
+  for (let i = -3; i <= 3; i++) {
+    const d = new Date(base); d.setDate(base.getDate() + i);
+    const iso = toISO(d);
+    trendLabels.push(d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }));
+    trendCounts.push(getRangeData(iso, iso).length);
+  }
+
+  const gridColor = 'rgba(0,0,0,0.06)';
+  const tickColor = '#9ca3af';
+  const tickFont  = { size: 11 };
+
+  // Data labels plugin config (inline values on bars/points)
+  const datalabels = {
+    anchor: 'end', align: 'end',
+    color: '#374151', font: { size: 11, weight: '600' },
+    formatter: v => v > 0 ? v : ''
+  };
+  const datalabelsDoughnut = {
+    color: '#fff', font: { size: 12, weight: '600' },
+    formatter: (v, ctx) => {
+      const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+      if (!total || v === 0) return '';
+      return `${v}\n(${Math.round(v / total * 100)}%)`;
+    }
+  };
+
+  // ── Terminal Bar ──
+  if (termChart) termChart.destroy();
+  termChart = new Chart(document.getElementById('terminalChart'), {
+    type: 'bar',
+    data: {
+      labels: TERMINALS,
+      datasets: [{ label: 'Trains', data: termCounts, backgroundColor: '#1a4d8c', borderRadius: 5, barThickness: 26 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        datalabels
+      },
+      scales: {
+        x: { ticks: { color: tickColor, font: tickFont }, grid: { display: false } },
+        y: { ticks: { color: tickColor, font: tickFont, stepSize: 1 }, grid: { color: gridColor }, beginAtZero: true }
+      }
+    },
+    plugins: [ChartDataLabels]
+  });
+
+  // ── Direction Donut ──
+  if (dirChartObj) dirChartObj.destroy();
+  dirChartObj = new Chart(document.getElementById('dirChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['East', 'West', 'North', 'South'],
+      datasets: [{ data: [dirs.East, dirs.West, dirs.North, dirs.South], backgroundColor: ['#e07020','#2070d4','#20a060','#9020d4'], borderWidth: 0 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '55%',
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 11 }, color: '#6b7280', boxWidth: 12, padding: 10 } },
+        datalabels: datalabelsDoughnut
+      }
+    },
+    plugins: [ChartDataLabels]
+  });
+
+  // ── 7-day Trend Line ──
+  if (trendChartObj) trendChartObj.destroy();
+  trendChartObj = new Chart(document.getElementById('trendChart'), {
+    type: 'line',
+    data: {
+      labels: trendLabels,
+      datasets: [{
+        label: 'Specials', data: trendCounts,
+        borderColor: '#d4a017', backgroundColor: 'rgba(212,160,23,0.1)',
+        borderWidth: 2.5, pointRadius: 5, pointBackgroundColor: '#d4a017',
+        tension: 0.35, fill: true
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        datalabels: { ...datalabels, align: 'top', color: '#d4a017' }
+      },
+      scales: {
+        x: { ticks: { color: tickColor, font: tickFont }, grid: { display: false } },
+        y: { ticks: { color: tickColor, font: tickFont, stepSize: 1 }, grid: { color: gridColor }, beginAtZero: true }
+      }
+    },
+    plugins: [ChartDataLabels]
+  });
+
+  // ── Maintenance Donut ──
+  if (maintChartObj) maintChartObj.destroy();
+  maintChartObj = new Chart(document.getElementById('maintChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['PM at DLI', 'Other Div'],
+      datasets: [{ data: [pmDLI, pmOther], backgroundColor: ['#c0392b','#2c7a4b'], borderWidth: 0 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '55%',
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 11 }, color: '#6b7280', boxWidth: 12, padding: 10 } },
+        datalabels: datalabelsDoughnut
+      }
+    },
+    plugins: [ChartDataLabels]
+  });
+}
+
+/* ============================================================
+   TABLE
+   ============================================================ */
+function setFilter(f, btn) {
+  activeFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentPage = 1;
+  renderTable();
+}
+
+function getPageData() {
+  let data = filteredData;
+  if (activeFilter !== 'all') {
+    data = data.filter(r => cell(r, COL.origPass) === activeFilter);
+  }
+  const search = document.getElementById('search-box').value.toLowerCase().trim();
+  if (search) {
+    data = data.filter(r => r.some(c => c && c.toString().toLowerCase().includes(search)));
+  }
+  return data;
+}
+
+function dirBadge(d) {
+  const map = { East: 'e', West: 'w', North: 'n', South: 's' };
+  const c = map[d] || '';
+  return `<span class="badge b-${c}">${d || '—'}</span>`;
+}
+
+function maintBadge(m) {
+  const u = (m || '').toString().toUpperCase();
+  if (u.includes('PM AT DLI') || u.trim() === 'PM') {
+    return `<span class="badge b-pm">${m}</span>`;
+  }
+  return m || '—';
+}
+
+function renderTable() {
+  const data  = getPageData();
+  const total = data.length;
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (currentPage > pages) currentPage = pages;
+
+  document.getElementById('table-header-label').textContent =
+    `Detailed Train List — ${total} record${total !== 1 ? 's' : ''} found`;
+  document.getElementById('pg-info').textContent  = `Page ${currentPage} of ${pages}`;
+  document.getElementById('pg-total').textContent = `Total records: ${total}`;
+  document.getElementById('btn-prev').disabled = currentPage === 1;
+  document.getElementById('btn-next').disabled = currentPage === pages;
+
+  const slice = data.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const tbody  = document.getElementById('table-body');
+  const noData = document.getElementById('no-data');
+
+  if (!slice.length) {
+    tbody.innerHTML = '';
+    noData.style.display = 'block';
+    return;
+  }
+  noData.style.display = 'none';
+
+  const opClass = t => t === 'Originating' ? 'b-orig' : 'b-pass';
+
+  tbody.innerHTML = slice.map(r => {
+    const op  = cell(r, COL.origPass);
+    const dir = cell(r, COL.direction);
+    const via = (r[COL.via2] || r[COL.via1] || '—');
+    return `<tr>
+      <td>${r[COL.sno]   || ''}</td>
+      <td><strong>${r[COL.trainNo] || '—'}</strong></td>
+      <td>${r[COL.fromStn] || '—'}</td>
+      <td>${r[COL.toStn]   || '—'}</td>
+      <td>${r[COL.dpTime]  || '—'}</td>
+      <td>${r[COL.arTime]  || '—'}</td>
+      <td>${dirBadge(dir)}</td>
+      <td><span class="badge ${opClass(op)}">${op || '—'}</span></td>
+      <td>${r[COL.terminal]  || '—'}</td>
+      <td>${maintBadge(r[COL.maint])}</td>
+      <td>${r[COL.trainType] || '—'}</td>
+      <td>${r[COL.totalLoad] || '—'}</td>
+      <td>${r[COL.loadDtls]  || '—'}</td>
+      <td>${via}</td>
+    </tr>`;
+  }).join('');
+}
+
+function prevPage() { if (currentPage > 1) { currentPage--; renderTable(); } }
+function nextPage() {
+  const pages = Math.max(1, Math.ceil(getPageData().length / PAGE_SIZE));
+  if (currentPage < pages) { currentPage++; renderTable(); }
+}
+</script>
+</body>
+</html>
